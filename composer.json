@@ -1,0 +1,16 @@
+{
+    "name": "ckfinder/kfinder-plugin-database-adapter-php",
+    "description": "Database storage plugin for CKFinder 3",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "CKSource",
+            "homepage": "http://cksource.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "CKSource\\CKFinder\\Plugin\\": "src/"
+        }
+    }
+}
