@@ -4,7 +4,7 @@
  * CKFinder
  * ========
  * http://cksource.com/ckfinder
- * Copyright (C) 2007-2015, CKSource - Frederico Knabben. All rights reserved.
+ * Copyright (C) 2007-2016, CKSource - Frederico Knabben. All rights reserved.
  *
  * The software, this file and its contents are subject to the MIT License.
  * Please read the LICENSE.md file before using, installing, copying,
@@ -13,7 +13,7 @@
 
 namespace CKSource\CKFinder\Plugin\DatabaseAdapter;
 
-// This line may be not required if autoloader can load from CKFinder plugins directory.
+// This line may not be needed if the autoloader can load from the CKFinder plugins directory.
 require_once __DIR__ . '/PDOAdapter.php';
 
 use CKSource\CKFinder\CKFinder;
@@ -31,19 +31,19 @@ class DatabaseAdapter implements PluginInterface
     {
         $backendFactory = $app->getBackendFactory();
 
-        // Register backend adapter named "database".
+        // Register a backend adapter named "database".
         $backendFactory->registerAdapter('database', function($backendConfig) use ($backendFactory) {
-            // Create an instance of PDOAdapter using backend options defined in CKFinder config.
+            // Create an instance of PDOAdapter using backend options defined in the CKFinder configuration.
             $pdo = new PDO($backendConfig['dsn'], $backendConfig['username'], $backendConfig['password']);
             $adapter = new PDOAdapter($pdo, $backendConfig['tableName']);
 
-            // Create and return CKFinder backend instance.
+            // Create and return a CKFinder backend instance.
             return $backendFactory->createBackend($backendConfig, $adapter);
         });
     }
 
     /**
-     * This plugin is a bit specific, as it uses only backend configuration options.
+     * This plugin is a bit specific, as it only uses backend configuration options.
      * This method can be ignored, and simply return an empty array.
      */
     public function getDefaultConfig()

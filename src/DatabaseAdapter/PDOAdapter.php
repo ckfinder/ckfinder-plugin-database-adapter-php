@@ -4,7 +4,7 @@
  * CKFinder
  * ========
  * http://cksource.com/ckfinder
- * Copyright (C) 2007-2015, CKSource - Frederico Knabben. All rights reserved.
+ * Copyright (C) 2007-2016, CKSource - Frederico Knabben. All rights reserved.
  *
  * The software, this file and its contents are subject to the MIT License.
  * Please read the LICENSE.md file before using, installing, copying,
@@ -20,9 +20,9 @@ use League\Flysystem\Util;
 use \PDO;
 
 /**
- * Class PDOAdapter
+ * The PDOAdapter class.
  *
- * Flysystem PDO Database adater.
+ * The Flysystem PDO Database adapter.
  */
 class PDOAdapter implements AdapterInterface
 {
@@ -39,7 +39,7 @@ class PDOAdapter implements AdapterInterface
     protected $table;
 
     /**
-     * PDOAdapter constructor.
+     * The PDOAdapter constructor.
      *
      * @param PDO    $pdo
      * @param string $tableName
@@ -326,7 +326,7 @@ class PDOAdapter implements AdapterInterface
     }
 
     /**
-     * Get all the meta data of a file or directory.
+     * Get all the metadata of a file or a directory.
      *
      * @param string $path
      *
@@ -346,7 +346,7 @@ class PDOAdapter implements AdapterInterface
     }
 
     /**
-     * Get all the meta data of a file or directory.
+     * Get all the metadata of a file or a directory.
      *
      * @param string $path
      *
@@ -358,7 +358,7 @@ class PDOAdapter implements AdapterInterface
     }
 
     /**
-     * Get the mimetype of a file.
+     * Get the MIME type of a file.
      *
      * @param string $path
      *

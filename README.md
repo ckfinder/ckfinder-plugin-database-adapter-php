@@ -1,8 +1,8 @@
 # CKFinder 3 Database Storage Plugin
 
-This is an CKFinder 3 plugin that adds a support for storing files in the database.
+This is a CKFinder 3 plugin that adds support for storing files in the database.
 
-This plugin is based on PHP [PDO extension](http://php.net/manual/en/book.pdo.php).
+This plugin is based on the PHP [PDO extension](http://php.net/manual/en/book.pdo.php).
 
 ## Plugin Installation
 
@@ -44,8 +44,8 @@ CREATE TABLE files (
 
 ## Configuration Options
 
-This plugin registers a new backend adapter type named `database`. To make use of the adapter, define a new backend with
-`adapter` set to `database`, and provide required configuration options like presented below:
+This plugin registers a new [backend adapter type](http://docs.cksource.com/ckfinder3-php/configuration.html#configuration_options_backends) named `database`. To use the adapter, define a new backend with
+the `adapter` option set to `database`, and provide required configuration options as presented below:
 
 ```php
 $config['backends'][] = array(
@@ -58,16 +58,16 @@ $config['backends'][] = array(
 );
 ```
 
-**Adapter-specific configuration options**
+**Adapter-specific Configuration Options**
 
 | Option name | Description |
 |-------------|-------------|
-| `dsn`       | The Data Source Name, or DSN, contains the information required to connect to the database. Please have a look at [PDO driver-specific documentation](http://php.net/manual/en/pdo.drivers.php) for details. |
+| `dsn`       | The Data Source Name, or DSN, contains the information required to connect to the database. Have a look at the [PDO driver-specific documentation](http://php.net/manual/en/pdo.drivers.php) for details. |
 | `tableName` | The name of the table in the database. |
 | `username`  | The user name for the DSN string (optional for some PDO drivers). |
 | `password`  | The password for the DSN string (optional for some PDO drivers). |
 
-When the backend is configured, you can use it in the resource type:
+When the backend is configured, you can use it in the [resource type](http://docs.cksource.com/ckfinder3-php/configuration.html#configuration_options_resourceTypes):
 
 ```php
 $config['resourceTypes'][] = array(
@@ -78,5 +78,5 @@ $config['resourceTypes'][] = array(
 
 # Note
 
-This plugin emulates a tree structured filesystem, therefore some of the operations (like renaming or deleting a folder)
+This plugin emulates a tree-structured file system, therefore some of the operations (like renaming or deleting a folder)
 may produce quite a lot of database queries, which results in a poor performance for some scenarios.
