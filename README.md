@@ -76,7 +76,12 @@ $config['resourceTypes'][] = array(
 );
 ```
 
-# Note
+## Note
 
 This plugin emulates a tree-structured file system, therefore some of the operations (like renaming or deleting a folder)
 may produce quite a lot of database queries, which results in a poor performance for some scenarios.
+
+## License
+
+Copyright (c) 2007-2016, CKSource - Frederico Knabben. All rights reserved.
+For license details see: [LICENSE.md](https://github.com/ckfinder/ckfinder-plugin-database-adapter-php/blob/master/LICENSE.md).
