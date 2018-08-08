@@ -6,7 +6,7 @@ This plugin is based on the PHP [PDO extension](http://php.net/manual/en/book.pd
 
 ## Plugin Installation
 
-See the [Plugin Installation and Configuration](http://docs.cksource.com/ckfinder3-php/plugins.html#plugins_installation_and_configuration) documentation.
+See the [Plugin Installation and Configuration](https://ckeditor.com/docs/ckfinder/ckfinder3-php/plugins.html#plugins_installation_and_configuration) documentation.
 
 ## Database Schema
 
@@ -44,7 +44,7 @@ CREATE TABLE files (
 
 ## Configuration Options
 
-This plugin registers a new [backend adapter type](http://docs.cksource.com/ckfinder3-php/configuration.html#configuration_options_backends) named `database`. To use the adapter, define a new backend with
+This plugin registers a new [backend adapter type](https://ckeditor.com/docs/ckfinder/ckfinder3-php/configuration.html#configuration_options_backends) named `database`. To use the adapter, define a new backend with
 the `adapter` option set to `database`, and provide required configuration options as presented below:
 
 ```php
@@ -67,7 +67,7 @@ $config['backends'][] = array(
 | `username`  | The user name for the DSN string (optional for some PDO drivers). |
 | `password`  | The password for the DSN string (optional for some PDO drivers). |
 
-When the backend is configured, you can use it in the [resource type](http://docs.cksource.com/ckfinder3-php/configuration.html#configuration_options_resourceTypes):
+When the backend is configured, you can use it in the [resource type](https://ckeditor.com/docs/ckfinder/ckfinder3-php/configuration.html#configuration_options_resourceTypes):
 
 ```php
 $config['resourceTypes'][] = array(
