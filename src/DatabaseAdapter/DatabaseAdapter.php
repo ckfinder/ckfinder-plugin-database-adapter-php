@@ -3,36 +3,35 @@
 /*
  * CKFinder
  * ========
- * http://cksource.com/ckfinder
- * Copyright (C) 2007-2016, CKSource - Frederico Knabben. All rights reserved.
+ * https://ckeditor.com/ckfinder/
+ * Copyright (c) 2007-2021, CKSource - Frederico Knabben. All rights reserved.
  *
- * The software, this file and its contents are subject to the MIT License.
- * Please read the LICENSE.md file before using, installing, copying,
- * modifying or distribute this file or part of its contents.
+ * The software, this file and its contents are subject to the CKFinder
+ * License. Please read the license.txt file before using, installing, copying,
+ * modifying or distribute this file or part of its contents. The contents of
+ * this file is part of the Source Code of CKFinder.
  */
 
 namespace CKSource\CKFinder\Plugin\DatabaseAdapter;
 
 // This line may not be needed if the autoloader can load from the CKFinder plugins directory.
-require_once __DIR__ . '/PDOAdapter.php';
+require_once __DIR__.'/PDOAdapter.php';
 
 use CKSource\CKFinder\CKFinder;
 use CKSource\CKFinder\Plugin\PluginInterface;
-use \PDO;
+use PDO;
 
 class DatabaseAdapter implements PluginInterface
 {
     /**
      * Injects the DI container to the plugin.
-     *
-     * @param CKFinder $app
      */
     public function setContainer(CKFinder $app)
     {
         $backendFactory = $app->getBackendFactory();
 
         // Register a backend adapter named "database".
-        $backendFactory->registerAdapter('database', function($backendConfig) use ($backendFactory) {
+        $backendFactory->registerAdapter('database', function ($backendConfig) use ($backendFactory) {
             // Create an instance of PDOAdapter using backend options defined in the CKFinder configuration.
             $pdo = new PDO($backendConfig['dsn'], $backendConfig['username'], $backendConfig['password']);
             $adapter = new PDOAdapter($pdo, $backendConfig['tableName']);
