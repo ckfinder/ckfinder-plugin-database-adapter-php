@@ -3,33 +3,37 @@
 /*
  * CKFinder
  * ========
- * http://cksource.com/ckfinder
- * Copyright (C) 2007-2016, CKSource - Frederico Knabben. All rights reserved.
+ * https://ckeditor.com/ckfinder/
+ * Copyright (c) 2007-2021, CKSource - Frederico Knabben. All rights reserved.
  *
- * The software, this file and its contents are subject to the MIT License.
- * Please read the LICENSE.md file before using, installing, copying,
- * modifying or distribute this file or part of its contents.
+ * The software, this file and its contents are subject to the CKFinder
+ * License. Please read the license.txt file before using, installing, copying,
+ * modifying or distribute this file or part of its contents. The contents of
+ * this file is part of the Source Code of CKFinder.
  */
 
 namespace CKSource\CKFinder\Plugin\DatabaseAdapter;
 
-use League\Flysystem\Adapter\Polyfill\NotSupportingVisibilityTrait;
-use League\Flysystem\AdapterInterface;
+use CKSource\CKFinder\Exception\InvalidConfigException;
 use League\Flysystem\Config;
-use League\Flysystem\Util;
-use \PDO;
+use League\Flysystem\DirectoryAttributes;
+use League\Flysystem\FileAttributes;
+use League\Flysystem\FilesystemAdapter;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\PathPrefixer;
+use League\MimeTypeDetection\FinfoMimeTypeDetector;
+use LogicException;
+use PDO;
 
 /**
  * The PDOAdapter class.
  *
  * The Flysystem PDO Database adapter.
  */
-class PDOAdapter implements AdapterInterface
+class PDOAdapter implements FilesystemAdapter
 {
-    use NotSupportingVisibilityTrait;
-
     /**
-     * @var \PDO
+     * @var PDO
      */
     protected $pdo;
 
@@ -38,13 +42,14 @@ class PDOAdapter implements AdapterInterface
      */
     protected $table;
 
+    protected FinfoMimeTypeDetector $mimeTypeDetector;
+
+    protected PathPrefixer $pathPrefixer;
+
     /**
      * The PDOAdapter constructor.
-     *
-     * @param PDO    $pdo
-     * @param string $tableName
      */
-    public function __construct(PDO $pdo, $tableName)
+    public function __construct(PDO $pdo, string $tableName)
     {
         $this->pdo = $pdo;
 
@@ -53,36 +58,51 @@ class PDOAdapter implements AdapterInterface
         }
 
         $this->table = $tableName;
+
+        $this->mimeTypeDetector = new FinfoMimeTypeDetector();
+
+        $this->pathPrefixer = new PathPrefixer('/');
     }
 
     /**
      * {@inheritdoc}
+     *
+     * @throws InvalidConfigException
      */
-    public function write($path, $contents, Config $config)
+    public function write($path, $contents, Config $config): void
     {
-        $statement = $this->pdo->prepare("INSERT INTO {$this->table} (path, contents, size, type, mimetype, timestamp) VALUES(:path, :contents, :size, :type, :mimetype, :timestamp)");
+        $query = $this->pdo->prepare(
+            "
+            INSERT INTO {$this->table} (path, contents, size, type, mimetype, timestamp)
+            VALUES(:path, :contents, :size, :type, :mimetype, :timestamp)
+            "
+        );
 
-        $size = strlen($contents);
+        $size = \strlen($contents);
         $type = 'file';
-        $mimetype = Util::guessMimeType($path, $contents);
+        $mimetype = $this->mimeTypeDetector->detectMimeType($path, $contents);
         $timestamp = time();
 
-        $statement->bindParam(':path', $path, PDO::PARAM_STR);
-        $statement->bindParam(':contents', $contents, PDO::PARAM_LOB);
-        $statement->bindParam(':size', $size, PDO::PARAM_INT);
-        $statement->bindParam(':type', $type, PDO::PARAM_STR);
-        $statement->bindParam(':mimetype', $mimetype, PDO::PARAM_STR);
-        $statement->bindParam(':timestamp', $timestamp, PDO::PARAM_INT);
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
+        $query->bindParam(':contents', $contents, PDO::PARAM_LOB);
+        $query->bindParam(':size', $size, PDO::PARAM_INT);
+        $query->bindParam(':type', $type, PDO::PARAM_STR);
+        $query->bindParam(':mimetype', $mimetype, PDO::PARAM_STR);
+        $query->bindParam(':timestamp', $timestamp, PDO::PARAM_INT);
 
-        return $statement->execute() ? compact('path', 'contents', 'size', 'type', 'mimetype', 'timestamp') : false;
+        try {
+            $query->execute();
+        } catch (\PDOException $exception) {
+            throw new InvalidConfigException('Query executing failed', [$exception->getMessage()], previous: $exception);
+        }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function writeStream($path, $resource, Config $config)
+    public function writeStream($path, $contents, Config $config): void
     {
-        return $this->write($path, stream_get_contents($resource), $config);
+        $this->write($path, stream_get_contents($contents), $config);
     }
 
     /**
@@ -90,23 +110,29 @@ class PDOAdapter implements AdapterInterface
      */
     public function update($path, $contents, Config $config)
     {
-        $statement = $this->pdo->prepare("UPDATE {$this->table} SET contents=:newcontents, mimetype=:mimetype, size=:size WHERE path=:path");
+        $query = $this->pdo->prepare(
+            "
+            UPDATE {$this->table}
+            SET contents=:newcontents, mimetype=:mimetype, size=:size
+            WHERE path=:path
+            "
+        );
 
-        $size = strlen($contents);
-        $mimetype = Util::guessMimeType($path, $contents);
+        $size = \strlen($contents);
+        $mimetype = $this->mimeTypeDetector->detectMimeType($path, $contents);
 
-        $statement->bindParam(':size', $size, PDO::PARAM_INT);
-        $statement->bindParam(':mimetype', $mimetype, PDO::PARAM_STR);
-        $statement->bindParam(':newcontents', $contents, PDO::PARAM_LOB);
-        $statement->bindParam(':path', $path, PDO::PARAM_STR);
+        $query->bindParam(':size', $size, PDO::PARAM_INT);
+        $query->bindParam(':mimetype', $mimetype, PDO::PARAM_STR);
+        $query->bindParam(':newcontents', $contents, PDO::PARAM_LOB);
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
 
-        return $statement->execute() ? compact('path', 'contents', 'size', 'mimetype') : false;
+        return $query->execute() ? compact('path', 'contents', 'size', 'mimetype') : false;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function updateStream($path, $resource, Config $config)
+    public function updateStream($path, $resource, Config $config): bool|array
     {
         return $this->update($path, stream_get_contents($resource), $config);
     }
@@ -114,132 +140,252 @@ class PDOAdapter implements AdapterInterface
     /**
      * {@inheritdoc}
      */
-    public function rename($path, $newpath)
+    public function rename($path, $newpath): bool
     {
-        $statement = $this->pdo->prepare("SELECT type FROM {$this->table} WHERE path=:path");
-        $statement->bindParam(':path', $path, PDO::PARAM_STR);
+        $query = $this->pdo->prepare(
+            "
+            SELECT type
+            FROM {$this->table}
+            WHERE path=:path
+            "
+        );
 
-        if ($statement->execute()) {
-            $object = $statement->fetch(PDO::FETCH_ASSOC);
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
 
-            if ($object['type'] === 'dir') {
+        if ($query->execute()) {
+            $object = $query->fetch(PDO::FETCH_ASSOC);
+
+            if ('dir' === $object['type']) {
                 $dirContents = $this->listContents($path, true);
 
-                $statement = $this->pdo->prepare("UPDATE {$this->table} SET path=:newpath WHERE path=:path");
+                $query = $this->pdo->prepare("UPDATE {$this->table} SET path=:newpath WHERE path=:path");
 
-                $pathLength = strlen($path);
+                $pathLength = \strlen($path);
 
-                $statement->bindParam(':path', $currentObjectPath, PDO::PARAM_STR);
-                $statement->bindParam(':newpath', $newObjectPath, PDO::PARAM_STR);
+                $query->bindParam(':path', $currentObjectPath, PDO::PARAM_STR);
+                $query->bindParam(':newpath', $newObjectPath, PDO::PARAM_STR);
 
                 foreach ($dirContents as $object) {
                     $currentObjectPath = $object['path'];
-                    $newObjectPath = $newpath . substr($currentObjectPath, $pathLength);
+                    $newObjectPath = $newpath.substr($currentObjectPath, $pathLength);
 
-                    $statement->execute();
+                    $query->execute();
                 }
             }
         }
 
-        $statement = $this->pdo->prepare("UPDATE {$this->table} SET path=:newpath WHERE path=:path");
+        $query = $this->pdo->prepare(
+            "
+            UPDATE {$this->table}
+            SET path=:newpath
+            WHERE path=:path
+            "
+        );
 
-        $statement->bindParam(':path', $path, PDO::PARAM_STR);
-        $statement->bindParam(':newpath', $newpath, PDO::PARAM_STR);
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
+        $query->bindParam(':newpath', $newpath, PDO::PARAM_STR);
 
-        return $statement->execute();
+        return $query->execute();
     }
 
     /**
      * {@inheritdoc}
      */
-    public function copy($path, $newpath)
+    public function copy(string $path, string $newpath, Config $config): void
     {
-        $statement = $this->pdo->prepare("SELECT * FROM {$this->table} WHERE path=:path");
+        $query = $this->pdo->prepare(
+            "
+            SELECT *
+            FROM {$this->table}
+            WHERE path=:path
+            "
+        );
 
-        $statement->bindParam(':path', $path, PDO::PARAM_STR);
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
 
-        if ($statement->execute()) {
-            $result = $statement->fetch(PDO::FETCH_ASSOC);
+        if ($query->execute()) {
+            $result = $query->fetch(PDO::FETCH_ASSOC);
 
             if (!empty($result)) {
-                $statement = $this->pdo->prepare("INSERT INTO {$this->table} (path, contents, size, type, mimetype, timestamp) VALUES(:path, :contents, :size, :type, :mimetype, :timestamp)");
+                $query = $this->pdo->prepare(
+                    "
+                    INSERT INTO {$this->table} (path, contents, size, type, mimetype, timestamp)
+                    VALUES(:path, :contents, :size, :type, :mimetype, :timestamp)
+                    "
+                );
 
-                $statement->bindParam(':path', $newpath, PDO::PARAM_STR);
-                $statement->bindParam(':contents', $result['contents'], PDO::PARAM_LOB);
-                $statement->bindParam(':size', $result['size'], PDO::PARAM_INT);
-                $statement->bindParam(':type', $result['type'], PDO::PARAM_STR);
-                $statement->bindParam(':mimetype', $result['mimetype'], PDO::PARAM_STR);
-                $statement->bindValue(':timestamp', time(), PDO::PARAM_INT);
+                $query->bindParam(':path', $newpath, PDO::PARAM_STR);
+                $query->bindParam(':contents', $result['contents'], PDO::PARAM_LOB);
+                $query->bindParam(':size', $result['size'], PDO::PARAM_INT);
+                $query->bindParam(':type', $result['type'], PDO::PARAM_STR);
+                $query->bindParam(':mimetype', $result['mimetype'], PDO::PARAM_STR);
+                $query->bindValue(':timestamp', time(), PDO::PARAM_INT);
 
-                return $statement->execute();
+                try {
+                    $query->execute();
+                } catch (\PDOException $exception) {
+                    throw new InvalidConfigException('Query executing failed', [$exception->getMessage()], previous: $exception);
+                }
             }
         }
-
-        return false;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function delete($path)
+    public function move(string $path, string $newpath, Config $config): void
     {
-        $statement = $this->pdo->prepare("DELETE FROM {$this->table} WHERE path=:path");
-
-        $statement->bindParam(':path', $path, PDO::PARAM_STR);
-
-        return $statement->execute();
+        $this->copy($path, $newpath, $config);
+        $this->delete($path);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function deleteDir($dirname)
+    public function delete($path): void
+    {
+        $query = $this->pdo->prepare(
+            "
+            DELETE FROM {$this->table}
+            WHERE path=:path
+            "
+        );
+
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
+
+        try {
+            $query->execute();
+        } catch (\PDOException $exception) {
+            throw new InvalidConfigException('Query executing failed', [$exception->getMessage()], previous: $exception);
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * @throws FilesystemException
+     */
+    public function deleteDirectory(string $dirname): void
     {
         $dirContents = $this->listContents($dirname, true);
 
         if (!empty($dirContents)) {
-            $statement = $this->pdo->prepare("DELETE FROM {$this->table} WHERE path=:path");
+            $query = $this->pdo->prepare(
+                "
+                DELETE FROM {$this->table}
+                WHERE path=:path
+                "
+            );
 
-            $statement->bindParam(':path', $currentObjectPath, PDO::PARAM_STR);
+            $query->bindParam(':path', $currentObjectPath, PDO::PARAM_STR);
 
             foreach ($dirContents as $object) {
                 $currentObjectPath = $object['path'];
-                $statement->execute();
+                $query->execute();
             }
         }
 
-        $statement = $this->pdo->prepare("DELETE FROM {$this->table} WHERE path=:path AND type='dir'");
+        $query = $this->pdo->prepare(
+            "
+            DELETE FROM {$this->table}
+            WHERE path=:path
+            AND type='dir'
+            "
+        );
 
-        $statement->bindParam(':path', $dirname, PDO::PARAM_STR);
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
 
-        return $statement->execute();
+        try {
+            $query->execute();
+        } catch (\PDOException $exception) {
+            throw new InvalidConfigException('Query executing failed', [$exception->getMessage()], previous: $exception);
+        }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function createDir($dirname, Config $config)
+    public function createDirectory(string $dirname, Config $config): void
     {
-        $statement = $this->pdo->prepare("INSERT INTO {$this->table} (path, type, timestamp) VALUES(:path, :type, :timestamp)");
+        $query = $this->pdo->prepare(
+            "
+            INSERT INTO {$this->table} (path, type, timestamp)
+            VALUES(:path, :type, :timestamp)
+            "
+        );
 
-        $statement->bindParam(':path', $dirname, PDO::PARAM_STR);
-        $statement->bindValue(':type', 'dir', PDO::PARAM_STR);
-        $statement->bindValue(':timestamp', time(), PDO::PARAM_STR);
+        $query->bindParam(':path', $dirname, PDO::PARAM_STR);
+        $query->bindValue(':type', 'dir', PDO::PARAM_STR);
+        $query->bindValue(':timestamp', time(), PDO::PARAM_STR);
 
-        return $statement->execute();
+        try {
+            $query->execute();
+        } catch (\PDOException $exception) {
+            throw new InvalidConfigException('Query executing failed', [$exception->getMessage()], previous: $exception);
+        }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function has($path)
+    public function has($path): bool
     {
-        $statement = $this->pdo->prepare("SELECT id FROM {$this->table} WHERE path=:path");
+        $query = $this->pdo->prepare(
+            "
+            SELECT id
+            FROM {$this->table}
+            WHERE path=:path
+            "
+        );
 
-        $statement->bindParam(':path', $path, PDO::PARAM_STR);
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
 
-        if ($statement->execute()) {
-            return (bool) $statement->fetch(PDO::FETCH_ASSOC);
+        if ($query->execute()) {
+            return (bool) $query->fetch(PDO::FETCH_ASSOC);
+        }
+
+        return false;
+    }
+
+    public function directoryExists(string $path): bool
+    {
+        $type = 'dir';
+
+        $query = $this->pdo->prepare(
+            "
+            SELECT id
+            FROM {$this->table}
+            WHERE path=:path AND type=:type
+            "
+        );
+
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
+        $query->bindParam(':type', $type, PDO::PARAM_STR);
+
+        if ($query->execute()) {
+            return (bool) $query->fetch(PDO::FETCH_ASSOC);
+        }
+
+        return false;
+    }
+
+    public function fileExists(string $path): bool
+    {
+        $type = 'file';
+
+        $query = $this->pdo->prepare(
+            "
+            SELECT id
+            FROM {$this->table}
+            WHERE path=:path AND type=:type
+            "
+        );
+
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
+        $query->bindParam(':type', $type, PDO::PARAM_STR);
+
+        if ($query->execute()) {
+            return (bool) $query->fetch(PDO::FETCH_ASSOC);
         }
 
         return false;
@@ -248,17 +394,23 @@ class PDOAdapter implements AdapterInterface
     /**
      * {@inheritdoc}
      */
-    public function read($path)
+    public function read(string $path): string
     {
-        $statement = $this->pdo->prepare("SELECT contents FROM {$this->table} WHERE path=:path");
+        $query = $this->pdo->prepare(
+            "
+            SELECT contents
+            FROM {$this->table}
+            WHERE path=:path
+            "
+        );
 
-        $statement->bindParam(':path', $path, PDO::PARAM_STR);
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
 
-        if ($statement->execute()) {
-            return $statement->fetch(PDO::FETCH_ASSOC);
+        if ($query->execute()) {
+            return $query->fetch(PDO::FETCH_ASSOC)['contents'];
         }
 
-        return false;
+        return '';
     }
 
     /**
@@ -275,109 +427,154 @@ class PDOAdapter implements AdapterInterface
             return false;
         }
 
-        fwrite($stream, $result['contents']);
+        fwrite($stream, $result);
         rewind($stream);
 
-        return compact('stream');
+        return $stream;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function listContents($directory = '', $recursive = false)
+    public function listContents($directory = '', $recursive = false): iterable
     {
         $query = "SELECT path, size, type, mimetype, timestamp FROM {$this->table}";
 
-        $useWhere = (bool) strlen($directory);
+        $useWhere = (bool) \strlen($directory);
 
         if ($useWhere) {
-            $query .= " WHERE path LIKE :path_prefix OR path=:path";
+            $query .= ' WHERE path LIKE :path_prefix';
         }
 
-        $statement = $this->pdo->prepare($query);
+        $query = $this->pdo->prepare($query);
 
         if ($useWhere) {
-            $pathPrefix = $directory . '/%';
-            $statement->bindParam(':path_prefix', $pathPrefix, PDO::PARAM_STR);
-            $statement->bindParam(':path', $directory, PDO::PARAM_STR);
+            $pathPrefix = $directory.'/%';
+            $query->bindParam(':path_prefix', $pathPrefix, PDO::PARAM_STR);
         }
 
-        if (!$statement->execute()) {
-            return [];
+        $result = $query->execute() ? $query->fetchAll(PDO::FETCH_ASSOC) : [];
+
+        // Level of directory you open in UI layer
+        $directoryLevel = substr_count($directory, '/') + 1;
+
+        // Loop that deletes all records from database that aren't children of opened directory in UI layer
+        foreach ($result as $key => $record) {
+            if (substr_count($record['path'], '/') > $directoryLevel) {
+                unset($result[$key]);
+            }
         }
 
-        $result = $statement->fetchAll(PDO::FETCH_ASSOC);
-
-        $result = array_map(function($v) {
-            $v['timestamp'] = (int) $v['timestamp'];
-            $v['size'] = (int) $v['size'];
-            $v['dirname'] = Util::dirname($v['path']);
-
-            if ($v['type'] === 'dir') {
-                unset($v['mimetype']);
-                unset($v['size']);
-                unset($v['contents']);
+        foreach ($result as $content) {
+            if ('dir' === $content['type']) {
+                yield new DirectoryAttributes(
+                    $content['path'],
+                    lastModified: $content['timestamp'],
+                );
             }
 
-            return $v;
-        }, $result);
-
-        return $recursive ? $result : Util::emulateDirectories($result);
-    }
-
-    /**
-     * Get all the metadata of a file or a directory.
-     *
-     * @param string $path
-     *
-     * @return array|false
-     */
-    public function getMetadata($path)
-    {
-        $statement = $this->pdo->prepare("SELECT id, path, size, type, mimetype, timestamp FROM {$this->table} WHERE path=:path");
-
-        $statement->bindParam(':path', $path, PDO::PARAM_STR);
-
-        if ($statement->execute()) {
-            return $statement->fetch(PDO::FETCH_ASSOC);
+            if ('file' === $content['type']) {
+                yield new FileAttributes(
+                    $content['path'],
+                    $content['size'] ?? null,
+                    lastModified: $content['timestamp'],
+                    mimeType: $content['mimeType'] ?? null,
+                );
+            }
         }
 
-        return false;
+        return [];
+    }
+
+    /**
+     * Get all the metadata of a file or a directory.
+     */
+    public function getMetadata(string $path): FileAttributes
+    {
+        $query = $this->pdo->prepare(
+            "
+            SELECT id, path, size, type, mimetype, timestamp
+            FROM {$this->table}
+            WHERE path=:path
+            "
+        );
+
+        $query->bindParam(':path', $path, PDO::PARAM_STR);
+
+        try {
+            $query->execute();
+        } catch (\PDOException $exception) {
+            throw new InvalidConfigException('Query executing failed', [$exception->getMessage()], previous: $exception);
+        }
+
+        $result = $query->fetch(PDO::FETCH_ASSOC);
+
+        return new FileAttributes(
+            $result['path'],
+            $result['size'],
+            $result['visibility'] ?? null,
+            $result['timestamp'],
+            $result['mimetype']
+        );
     }
 
     /**
      * Get all the metadata of a file or a directory.
      *
-     * @param string $path
-     *
-     * @return array|false
+     * @throws InvalidConfigException
      */
-    public function getSize($path)
+    public function fileSize(string $path): FileAttributes
     {
         return $this->getMetadata($path);
     }
 
     /**
-     * Get the MIME type of a file.
+     * Get the MIME type of file.
      *
-     * @param string $path
-     *
-     * @return array|false
+     * @throws InvalidConfigException
      */
-    public function getMimetype($path)
+    public function mimeType(string $path): FileAttributes
     {
         return $this->getMetadata($path);
     }
 
     /**
-     * Get the timestamp of a file.
+     * Get the timestamp of file.
      *
-     * @param string $path
-     *
-     * @return array|false
+     * @throws InvalidConfigException
      */
-    public function getTimestamp($path)
+    public function lastModified(string $path): FileAttributes
     {
         return $this->getMetadata($path);
+    }
+
+    /**
+     * Get the visibility of file.
+     *
+     * @throws InvalidConfigException
+     */
+    public function visibility(string $path): FileAttributes
+    {
+        return $this->getMetadata($path);
+    }
+
+    /**
+     * Get the visibility of a file.
+     *
+     * @throws LogicException
+     */
+    public function getVisibility(string $path)
+    {
+        throw new LogicException(static::class.' does not support visibility. Path: '.$path);
+    }
+
+    /**
+     * Set the visibility for a file.
+     *
+     * @throws LogicException
+     */
+    public function setVisibility(string $path, string $visibility): void
+    {
+        throw new LogicException(static::class.' does not support visibility. Path: '.$path.', visibility: '.$visibility);
     }
 }
