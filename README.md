@@ -83,5 +83,5 @@ may produce quite a lot of database queries, which results in a poor performance
 
 ## License
 
-Copyright (c) 2007-2016, CKSource - Frederico Knabben. All rights reserved.
+Copyright (c) 2007-2022, CKSource Holding sp. z o.o. All rights reserved.
 For license details see: [LICENSE.md](https://github.com/ckfinder/ckfinder-plugin-database-adapter-php/blob/master/LICENSE.md).

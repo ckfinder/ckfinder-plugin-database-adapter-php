@@ -10,7 +10,7 @@ All sample plugins are licensed under the terms of the MIT License (see Appendix
 Trademarks
 ----------
 
-CKFinder is a trademark of CKSource - Frederico Knabben. All other brand
+CKFinder is a trademark of CKSource Holding sp. z o.o. All other brand
 and product names are trademarks, registered trademarks or service
 marks of their respective holders.
 
@@ -21,7 +21,7 @@ Appendix A: The MIT License
 
 The MIT License (MIT)
 
-Copyright (c) 2007-2016, CKSource - Frederico Knabben
+Copyright (c) 2007-2022, CKSource Holding sp. z o.o.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
